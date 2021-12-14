@@ -14,6 +14,7 @@
 package storage
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/pprof/profile"
@@ -22,6 +23,18 @@ import (
 type ValueType struct {
 	Type string
 	Unit string
+}
+
+func (v ValueType) String() string {
+	return v.Type + ":" + v.Unit
+}
+
+func ValueTypeFromString(s string) ValueType {
+	parts := strings.Split(s, ":")
+	return ValueType{
+		Type: parts[0],
+		Unit: parts[1],
+	}
 }
 
 type InstantProfileMeta struct {
