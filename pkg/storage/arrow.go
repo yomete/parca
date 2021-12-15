@@ -218,6 +218,21 @@ func (q *querier) Select(hints *SelectHints, ms ...*labels.Matcher) SeriesSet {
 
 	ss := make([]Series, 0, postings.GetCardinality())
 
+	if hints.Root {
+		for id, rs := range records {
+			ss = append(ss, &ArrowRootSeries{
+				schema:     q.db.Schema,
+				meta:       q.db.Metadata(),
+				records:    rs,
+				labelSetID: id,
+				mint:       q.mint,
+				maxt:       q.maxt,
+			})
+		}
+
+		return &SliceSeriesSet{series: ss, i: -1}
+	}
+
 	for id, rs := range records {
 		ss = append(ss, &ArrowSeries{
 			schema:     q.db.Schema,
@@ -257,22 +272,20 @@ func (as *ArrowSeries) Labels() labels.Labels {
 }
 
 func (as *ArrowSeries) Iterator() ProfileSeriesIterator {
-	a := &ArrowSeriesIterator{
-		err:     nil,
+	return &ArrowSeriesIterator{
 		meta:    as.meta,
 		records: as.records,
+		numRead: -1,
 	}
-
-	return a
 }
 
 type ArrowSeriesIterator struct {
-	err error
-
 	meta    arrow.Metadata
 	table   array.Table
 	records []array.Record
-	idx     int
+
+	numRead int
+	err     error
 }
 
 func (it *ArrowSeriesIterator) Err() error {
@@ -280,12 +293,12 @@ func (it *ArrowSeriesIterator) Err() error {
 }
 
 func (it *ArrowSeriesIterator) Next() bool {
-	it.idx++
-	return it.idx <= len(it.records)
+	it.numRead++
+	return it.numRead < len(it.records)
 }
 
 func (it *ArrowSeriesIterator) At() InstantProfile {
-	r := it.records[it.idx-1]
+	r := it.records[it.numRead]
 	s := array.NewStringData(r.Column(colStacktraceID).Data())
 	//t := array.NewInt64Data(r.Column(colTimestamp).Data())
 	d := array.NewInt64Data(r.Column(colValue).Data())
@@ -297,33 +310,46 @@ func (it *ArrowSeriesIterator) At() InstantProfile {
 		}
 	}
 
+	profileMeta := InstantProfileMeta{}
+
 	meta := r.Schema().Metadata()
-	p := meta.Values()[meta.FindKey(periodMeta)]
-	period, err := strconv.ParseInt(p, 10, 64)
-	if err != nil {
-		panic("oh noes")
+	{
+		ts := meta.Values()[meta.FindKey(timestampMeta)]
+		timestamp, err := strconv.ParseInt(ts, 10, 64)
+		if err != nil {
+			it.err = err
+			return nil
+		}
+		profileMeta.Timestamp = timestamp
 	}
-	pt := meta.Values()[meta.FindKey(periodTypeMeta)]
-	dur := meta.Values()[meta.FindKey(durationMeta)]
-	duration, err := strconv.ParseInt(dur, 10, 64)
-	if err != nil {
-		panic("oh noes")
+	{
+		dur := meta.Values()[meta.FindKey(durationMeta)]
+		duration, err := strconv.ParseInt(dur, 10, 64)
+		if err != nil {
+			it.err = err
+			return nil
+		}
+		profileMeta.Duration = duration
 	}
-	st := meta.Values()[meta.FindKey(sampleTypeMeta)]
-	ts := meta.Values()[meta.FindKey(timestampMeta)]
-	timestamp, err := strconv.ParseInt(ts, 10, 64)
-	if err != nil {
-		panic("oh noes")
+	{
+		p := meta.Values()[meta.FindKey(periodMeta)]
+		period, err := strconv.ParseInt(p, 10, 64)
+		if err != nil {
+			it.err = err
+			return nil
+		}
+		profileMeta.Period = period
 	}
 
+	profileMeta.SampleType = ValueTypeFromString(
+		meta.Values()[meta.FindKey(sampleTypeMeta)],
+	)
+	profileMeta.PeriodType = ValueTypeFromString(
+		meta.Values()[meta.FindKey(periodTypeMeta)],
+	)
+
 	return &FlatProfile{
-		Meta: InstantProfileMeta{
-			PeriodType: ValueTypeFromString(pt),
-			SampleType: ValueTypeFromString(st),
-			Timestamp:  timestamp,
-			Duration:   duration,
-			Period:     period,
-		},
+		Meta:    profileMeta,
 		samples: samples,
 	}
 }
