@@ -53,6 +53,9 @@ type ArrowDB struct {
 	// locationReverseIdx is a reverse index of locationID's to stack traces
 	locationReverseIdx map[string][]*metastore.Location
 
+	// labelReverseIdx is a reverse index of labesetIDs to labels
+	labelReverseIdx map[uint64]labels.Labels
+
 	logger log.Logger
 
 	idx *LabelIndex
@@ -68,6 +71,7 @@ func NewArrowDB(logger log.Logger) *ArrowDB {
 			postings: index.NewMemPostings(),
 		},
 		locationReverseIdx: map[string][]*metastore.Location{},
+		labelReverseIdx:    map[uint64]labels.Labels{},
 	}
 }
 
@@ -91,9 +95,9 @@ func (db *ArrowDB) String() string {
 
 // Appender implements the storage.Appender interface
 func (db *ArrowDB) Appender(ctx context.Context, lset labels.Labels) (Appender, error) {
-	// TODO probably not safe to perform here; as there's no guarantee that anything is ever appended
-	// TODO: We need to also store the lset itself to be able to return it in the ArrowSeries later
-	db.idx.postings.Add(lset.Hash(), lset)
+	lsetID := lset.Hash()
+	db.labelReverseIdx[lsetID] = lset      // TODO probably not safe to perform here; as there's no guarantee that anything is ever appended
+	db.idx.postings.Add(lset.Hash(), lset) // TODO probably not safe to perform here; as there's no guarantee that anything is ever appended
 	return &appender{
 		lsetID: lset.Hash(),
 		db:     db,
@@ -254,6 +258,7 @@ func (q *querier) Select(hints *SelectHints, ms ...*labels.Matcher) SeriesSet {
 			mint:               q.mint,
 			maxt:               q.maxt,
 			locationReverseIdx: q.db.locationReverseIdx,
+			labelReverseIdx:    q.db.labelReverseIdx,
 		})
 	}
 
@@ -276,6 +281,7 @@ type ArrowSeries struct {
 
 	// locationReverseIdx is a reverse index of locationID's to stack traces
 	locationReverseIdx map[string][]*metastore.Location
+	labelReverseIdx    map[uint64]labels.Labels
 
 	mint, maxt int64
 }
@@ -293,6 +299,7 @@ func (as *ArrowSeries) Iterator() ProfileSeriesIterator {
 		records:            as.records,
 		numRead:            -1,
 		locationReverseIdx: as.locationReverseIdx,
+		labelReverseIdx:    as.labelReverseIdx,
 	}
 }
 
@@ -301,6 +308,7 @@ type ArrowSeriesIterator struct {
 	table              array.Table
 	records            []array.Record
 	locationReverseIdx map[string][]*metastore.Location
+	labelReverseIdx    map[uint64]labels.Labels
 
 	numRead int
 	err     error
@@ -321,21 +329,36 @@ func (it *ArrowSeriesIterator) At() InstantProfile {
 	//t := array.NewInt64Data(r.Column(colTimestamp).Data())
 	d := array.NewInt64Data(r.Column(colValue).Data())
 
+	meta := r.Schema().Metadata()
+	// Grabe the labelset ID from the metadata
+	lsm := meta.Values()[meta.FindKey(labelsetMeta)]
+	lsID, err := strconv.ParseUint(lsm, 10, 64)
+	if err != nil {
+		it.err = err
+		return nil
+	}
+
+	lblMap := it.labelReverseIdx[lsID].Map()
+	labels := make(map[string][]string, len(lblMap))
+	numLabels := make(map[string][]int64, len(lblMap))
+	for k, v := range lblMap {
+		labels[k] = []string{v}
+		numLabels[k] = []int64{1}
+	}
+
 	samples := map[string]*Sample{}
 	for i := 0; i < r.Column(colStacktraceID).Len(); i++ {
 		samples[s.Value(i)] = &Sample{
 			Location: it.locationReverseIdx[s.Value(i)],
 			Value:    d.Value(i),
 			//DiffValue: 0,
-			//Label:     map[string][]string{},
-			//NumLabel:  map[string][]int64{},
+			Label:    labels,
+			NumLabel: numLabels,
 			//NumUnit:   map[string][]string{},
 		}
 	}
 
 	profileMeta := InstantProfileMeta{}
-
-	meta := r.Schema().Metadata()
 	{
 		ts := meta.Values()[meta.FindKey(timestampMeta)]
 		timestamp, err := strconv.ParseInt(ts, 10, 64)
