@@ -218,7 +218,7 @@ func (q *querier) Select(hints *SelectHints, ms ...*labels.Matcher) SeriesSet {
 
 	ss := make([]Series, 0, postings.GetCardinality())
 
-	if hints.Root {
+	if hints != nil && hints.Root {
 		for id, rs := range records {
 			ss = append(ss, &ArrowRootSeries{
 				schema:     q.db.Schema,
