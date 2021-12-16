@@ -10,7 +10,9 @@ import (
 	"github.com/apache/arrow/go/arrow/array"
 	"github.com/apache/arrow/go/arrow/memory"
 	"github.com/dgraph-io/sroar"
+	"github.com/go-kit/log"
 	"github.com/parca-dev/parca/pkg/storage/index"
+	"github.com/parca-dev/parca/pkg/storage/metastore"
 	"github.com/prometheus/prometheus/pkg/labels"
 )
 
@@ -48,17 +50,24 @@ type ArrowDB struct {
 	// canonically a record is a profile (TODO?)
 	recordList []array.Record
 
+	// locationReverseIdx is a reverse index of locationID's to stack traces
+	locationReverseIdx map[string][]*metastore.Location
+
+	logger log.Logger
+
 	idx *LabelIndex
 }
 
 // NewArrowDB returns a new arrow db
-func NewArrowDB() *ArrowDB {
+func NewArrowDB(logger log.Logger) *ArrowDB {
 	return &ArrowDB{
 		GoAllocator: memory.NewGoAllocator(),
 		Schema:      arrow.NewSchema(schemaFields, nil), // no metadata (TODO)
+		logger:      logger,
 		idx: &LabelIndex{
 			postings: index.NewMemPostings(),
 		},
+		locationReverseIdx: map[string][]*metastore.Location{},
 	}
 }
 
@@ -123,6 +132,9 @@ func (a *appender) AppendFlat(ctx context.Context, p *FlatProfile) error {
 		b.Field(colStacktraceID).(*array.StringBuilder).Append(id)
 		//b.Field(colTimestamp).(*array.Time64Builder).Append(arrow.Time64(p.Meta.Timestamp))
 		b.Field(colValue).(*array.Int64Builder).Append(s.Value)
+
+		// Record the locations in the reverse index
+		a.db.locationReverseIdx[id] = s.Location
 	}
 
 	// Create and store the record
@@ -235,12 +247,13 @@ func (q *querier) Select(hints *SelectHints, ms ...*labels.Matcher) SeriesSet {
 
 	for id, rs := range records {
 		ss = append(ss, &ArrowSeries{
-			schema:     q.db.Schema,
-			meta:       q.db.Metadata(),
-			records:    rs,
-			labelSetID: id,
-			mint:       q.mint,
-			maxt:       q.maxt,
+			schema:             q.db.Schema,
+			meta:               q.db.Metadata(),
+			records:            rs,
+			labelSetID:         id,
+			mint:               q.mint,
+			maxt:               q.maxt,
+			locationReverseIdx: q.db.locationReverseIdx,
 		})
 	}
 
@@ -261,6 +274,9 @@ type ArrowSeries struct {
 	records    []array.Record
 	labelSetID uint64
 
+	// locationReverseIdx is a reverse index of locationID's to stack traces
+	locationReverseIdx map[string][]*metastore.Location
+
 	mint, maxt int64
 }
 
@@ -273,16 +289,18 @@ func (as *ArrowSeries) Labels() labels.Labels {
 
 func (as *ArrowSeries) Iterator() ProfileSeriesIterator {
 	return &ArrowSeriesIterator{
-		meta:    as.meta,
-		records: as.records,
-		numRead: -1,
+		meta:               as.meta,
+		records:            as.records,
+		numRead:            -1,
+		locationReverseIdx: as.locationReverseIdx,
 	}
 }
 
 type ArrowSeriesIterator struct {
-	meta    arrow.Metadata
-	table   array.Table
-	records []array.Record
+	meta               arrow.Metadata
+	table              array.Table
+	records            []array.Record
+	locationReverseIdx map[string][]*metastore.Location
 
 	numRead int
 	err     error
@@ -306,7 +324,12 @@ func (it *ArrowSeriesIterator) At() InstantProfile {
 	samples := map[string]*Sample{}
 	for i := 0; i < r.Column(colStacktraceID).Len(); i++ {
 		samples[s.Value(i)] = &Sample{
-			Value: d.Value(i),
+			Location: it.locationReverseIdx[s.Value(i)],
+			Value:    d.Value(i),
+			//DiffValue: 0,
+			//Label:     map[string][]string{},
+			//NumLabel:  map[string][]int64{},
+			//NumUnit:   map[string][]string{},
 		}
 	}
 

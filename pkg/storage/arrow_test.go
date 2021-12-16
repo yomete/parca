@@ -39,7 +39,7 @@ func Test_Arrow_AppendProfile(t *testing.T) {
 	fp2, err := FlatProfileFromPprof(ctx, logger, ms, p2, 0)
 	require.NoError(t, err)
 
-	db := NewArrowDB()
+	db := NewArrowDB(log.NewNopLogger())
 	appender, _ := db.Appender(ctx, labels.Labels{
 		{
 			Name:  "__name__",
@@ -117,7 +117,7 @@ func Test_Arrow_MultipleSeries(t *testing.T) {
 	fp2, err := FlatProfileFromPprof(ctx, logger, ms, p2, 0)
 	require.NoError(t, err)
 
-	db := NewArrowDB()
+	db := NewArrowDB(log.NewNopLogger())
 
 	app1, err := db.Appender(ctx, labels.FromStrings("foo", "1"))
 	require.NoError(t, err)
