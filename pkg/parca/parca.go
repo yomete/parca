@@ -146,6 +146,7 @@ func Run(ctx context.Context, logger log.Logger, reg *prometheus.Registry, flags
 	switch flags.Storage {
 	case arrowStorage:
 		db = storage.NewArrowDB()
+		flags.StorageTSDBProfileTrees = false // turn off profile trees for arrowdb
 	case tsdbStorage:
 		fallthrough
 	default:
@@ -217,10 +218,10 @@ func Run(ctx context.Context, logger log.Logger, reg *prometheus.Registry, flags
 				sym.Close()
 			})
 	}
-	{
+	if flags.Storage == tsdbStorage {
 		ctx, cancel := context.WithCancel(ctx)
 		gr.Add(func() error {
-			return db.Run(ctx)
+			return db.(*storage.DB).Run(ctx)
 		}, func(err error) {
 			level.Debug(logger).Log("msg", "db exiting")
 			cancel()
