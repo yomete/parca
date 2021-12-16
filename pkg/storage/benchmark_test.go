@@ -146,7 +146,7 @@ func BenchmarkArrowAppends(b *testing.B) {
 		metastore.NewRandomUUIDGenerator(),
 	)
 
-	db := storage.NewArrowDB()
+	db := storage.NewArrowDB(logger)
 
 	lset := labels.FromStrings("job", "parca", "n", strconv.Itoa(b.N))
 	app, err := db.Appender(ctx, lset)
@@ -249,7 +249,7 @@ func BenchmarkArrowIterator(b *testing.B) {
 		l.Close()
 	})
 
-	db := storage.NewArrowDB()
+	db := storage.NewArrowDB(logger)
 
 	lset := labels.FromStrings("job", "parca", "n", strconv.Itoa(b.N))
 	app, err := db.Appender(ctx, lset)

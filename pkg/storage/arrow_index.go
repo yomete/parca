@@ -3,6 +3,7 @@ package storage
 import (
 	"math"
 	"sort"
+	"sync"
 
 	"github.com/dgraph-io/sroar"
 	"github.com/parca-dev/parca/pkg/storage/index"
@@ -13,11 +14,36 @@ import (
 // LabelIndex implements the storage.IndexReader interface
 type LabelIndex struct {
 	postings *index.MemPostings
+
+	mu      *sync.RWMutex
+	reverse map[uint64]labels.Labels
+}
+
+func NewLabelIndex() *LabelIndex {
+	return &LabelIndex{
+		postings: index.NewMemPostings(),
+
+		mu:      &sync.RWMutex{},
+		reverse: map[uint64]labels.Labels{},
+	}
 }
 
 // Close noop
 func (l *LabelIndex) Close() error {
 	return nil
+}
+
+// Add the lset both to the postings and reverse index.
+func (l *LabelIndex) Add(lset labels.Labels) uint64 {
+	lsetID := lset.Hash()
+
+	l.postings.Add(lsetID, lset)
+
+	l.mu.Lock()
+	l.reverse[lsetID] = lset
+	l.mu.Unlock()
+
+	return lsetID
 }
 
 // Postings returns the postings list iterator for the label pairs.
@@ -46,6 +72,16 @@ func (l *LabelIndex) LabelValues(name string, matchers ...*labels.Matcher) ([]st
 	}
 
 	return labelValuesWithMatchers(l, name, matchers...)
+}
+
+func (l *LabelIndex) LabelsForID(id uint64) labels.Labels {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	if lset, found := l.reverse[id]; found {
+		return lset
+	}
+	return labels.Labels{}
 }
 
 func (l *LabelIndex) LabelValueFor(id uint64, label string) (string, error) {

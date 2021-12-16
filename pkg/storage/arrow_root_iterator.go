@@ -10,17 +10,16 @@ import (
 )
 
 type ArrowRootSeries struct {
-	schema          *arrow.Schema
-	meta            arrow.Metadata
-	records         []array.Record
-	labelSetID      uint64
-	mint            int64
-	maxt            int64
-	labelReverseIdx map[uint64]labels.Labels
+	schema  *arrow.Schema
+	meta    arrow.Metadata
+	lset    labels.Labels
+	records []array.Record
+	mint    int64
+	maxt    int64
 }
 
 func (ars *ArrowRootSeries) Labels() labels.Labels {
-	return ars.labelReverseIdx[ars.labelSetID]
+	return ars.lset
 }
 
 func (ars *ArrowRootSeries) Iterator() ProfileSeriesIterator {
