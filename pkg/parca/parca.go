@@ -54,7 +54,17 @@ import (
 	"github.com/parca-dev/parca/pkg/storage"
 )
 
-const symbolizationInterval = 10 * time.Second
+const (
+	symbolizationInterval = 10 * time.Second
+
+	tsdbStorage  = "tsdb"
+	arrowStorage = "arrow"
+)
+
+type database interface {
+	storage.Appendable
+	storage.Queryable
+}
 
 type Flags struct {
 	ConfigPath         string   `default:"parca.yaml" help:"Path to config file."`
@@ -63,6 +73,8 @@ type Flags struct {
 	CORSAllowedOrigins []string `help:"Allowed CORS origins."`
 	OTLPAddress        string   `help:"OpenTelemetry collector address to send traces to."`
 	Version            bool     `help:"Show application version."`
+
+	Storage string `default:"tsdb" help:"Storage backend to use (tsdb, arrow)"`
 
 	StorageTSDBRetentionTime    time.Duration `default:"6h" help:"How long to retain samples in storage."`
 	StorageTSDBExpensiveMetrics bool          `default:"false" help:"Enable really heavy metrics. Only do this for debugging as the metrics are slowing Parca down by a lot." hidden:"true"`
@@ -130,14 +142,23 @@ func Run(ctx context.Context, logger log.Logger, reg *prometheus.Registry, flags
 		return err
 	}
 
-	db := storage.OpenDB(
-		reg,
-		tracerProvider.Tracer("db"),
-		&storage.DBOptions{
-			Retention:            flags.StorageTSDBRetentionTime,
-			HeadExpensiveMetrics: flags.StorageTSDBExpensiveMetrics,
-		},
-	)
+	var db database
+	switch flags.Storage {
+	case arrowStorage:
+		db = storage.NewArrowDB()
+	case tsdbStorage:
+		fallthrough
+	default:
+		db = storage.OpenDB(
+			reg,
+			tracerProvider.Tracer("db"),
+			&storage.DBOptions{
+				Retention:            flags.StorageTSDBRetentionTime,
+				HeadExpensiveMetrics: flags.StorageTSDBExpensiveMetrics,
+			},
+		)
+	}
+
 	s := profilestore.NewProfileStore(
 		logger,
 		tracerProvider.Tracer("profilestore"),
