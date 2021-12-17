@@ -29,6 +29,7 @@ package chunkenc
 import (
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"testing"
 
@@ -48,6 +49,23 @@ func TestChunk(t *testing.T) {
 			}
 		})
 	}
+}
+
+func FuzzChunk(f *testing.F) {
+	c := NewXORChunk()
+
+	app, err := c.Appender()
+	require.NoError(f, err)
+
+	for _, v := range []int64{-1, 0, 1, math.MinInt64, math.MaxInt64} {
+		f.Add(v)
+	}
+
+	f.Fuzz(func(t *testing.T, v int64) {
+		app.Append(v)
+	})
+
+	f.Logf("fuzzed appending %d bytes", c.Bytes())
 }
 
 func testChunk(t *testing.T, c Chunk) {
