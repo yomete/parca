@@ -103,10 +103,6 @@ type appender struct {
 	db     *ArrowDB
 }
 
-func (a *appender) Append(ctx context.Context, p *Profile) error {
-	panic("unimplemented")
-}
-
 // AppendFlat implements the Appender interface
 func (a *appender) AppendFlat(ctx context.Context, p *FlatProfile) error {
 	//tenant := "tenant-placeholder"
