@@ -135,7 +135,8 @@ func (a *appender) AppendFlat(ctx context.Context, p *FlatProfile) error {
 	return nil
 }
 
-func (db *ArrowDB) Querier(ctx context.Context, mint, maxt int64, _ bool) Querier {
+// Querier ...
+func (db *ArrowDB) Querier(ctx context.Context, mint, maxt int64) Querier {
 	min := sort.Search(len(db.recordList), func(i int) bool {
 		meta := db.recordList[i].Schema().Metadata()
 		ts := meta.Values()[meta.FindKey(timestampMeta)]
