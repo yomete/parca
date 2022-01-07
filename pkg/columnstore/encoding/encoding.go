@@ -3,8 +3,8 @@ package encoding
 type Encoding uint64
 
 const (
-	Plain Encoding = iota
-	RLE
-	Dictionary
-	DictionaryRLE
+	PlainEncoding Encoding = iota
+	RLEEncoding
+	DictionaryEncoding
+	DictionaryRLEEncoding
 )
