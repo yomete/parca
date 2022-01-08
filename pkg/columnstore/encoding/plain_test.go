@@ -14,16 +14,16 @@ func TestPlain(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, count)
 	require.Equal(t, []types.Value{
-		types.Value{Data: "test"},
-		types.Value{},
-		types.Value{},
-		types.Value{},
-		types.Value{},
-		types.Value{},
-		types.Value{},
-		types.Value{},
-		types.Value{},
-		types.Value{},
+		{Data: "test"},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
 	}, p.values)
 }
 
@@ -39,16 +39,16 @@ func TestPlainInsertTwo(t *testing.T) {
 	require.Equal(t, 2, count)
 
 	require.Equal(t, []types.Value{
-		types.Value{Data: "test1"},
-		types.Value{Data: "test3"},
-		types.Value{},
-		types.Value{},
-		types.Value{},
-		types.Value{},
-		types.Value{},
-		types.Value{},
-		types.Value{},
-		types.Value{},
+		{Data: "test1"},
+		{Data: "test3"},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
 	}, p.values)
 }
 
@@ -68,16 +68,16 @@ func TestPlainInsertMany(t *testing.T) {
 	require.Equal(t, 3, count)
 
 	require.Equal(t, []types.Value{
-		types.Value{Data: "test1"},
-		types.Value{Data: "test2"},
-		types.Value{Data: "test3"},
-		types.Value{},
-		types.Value{},
-		types.Value{},
-		types.Value{},
-		types.Value{},
-		types.Value{},
-		types.Value{},
+		{Data: "test1"},
+		{Data: "test2"},
+		{Data: "test3"},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
+		{},
 	}, p.values)
 }
 
