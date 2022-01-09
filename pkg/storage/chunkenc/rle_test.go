@@ -116,17 +116,54 @@ func Test_RLEChunk_Insert(t *testing.T) {
 	}
 	require.Equal(t, []byte{0, 6, 0, 2, 2, 0, 4, 6, 0, 2, 0}, c.Bytes())
 
-	// Insert out of place; clean split
-	app.(*rleAppender).Insert(4, 2)
-
-	require.Equal(t, []byte{0, 7, 0, 3, 2, 0, 4, 4, 0, 1, 6, 0, 2, 0}, c.Bytes())
-
+	fmt.Println(c.Bytes())
 	it := c.Iterator(nil)
 	for it.Next() {
-		fmt.Println(it.At())
+		fmt.Printf("%v,", it.At())
 	}
+	fmt.Printf("\n")
+
+	// Insert out of place; clean split
+	app.(*rleAppender).Insert(4, 2)
+	require.Equal(t, []byte{0, 7, 0, 3, 2, 0, 4, 4, 0, 1, 6, 0, 2, 0}, c.Bytes())
+
+	fmt.Println(c.Bytes())
+	it = c.Iterator(nil)
+	for it.Next() {
+		fmt.Printf("%v,", it.At())
+	}
+	fmt.Printf("\n")
 
 	// Insert out of place; clean split
 	app.(*rleAppender).Insert(5, 7)
 	require.Equal(t, []byte{0, 8, 0, 4, 2, 0, 4, 4, 0, 1, 14, 0, 1, 6, 0, 2, 0}, c.Bytes())
+
+	fmt.Println(c.Bytes())
+	it = c.Iterator(nil)
+	for it.Next() {
+		fmt.Printf("%v,", it.At())
+	}
+	fmt.Printf("\n")
+
+	// Insert in place;
+	app.(*rleAppender).Insert(5, 7)
+	require.Equal(t, []byte{0, 9, 0, 4, 2, 0, 4, 4, 0, 1, 14, 0, 2, 6, 0, 2, 0}, c.Bytes())
+
+	fmt.Println(c.Bytes())
+	it = c.Iterator(nil)
+	for it.Next() {
+		fmt.Printf("%v,", it.At())
+	}
+	fmt.Printf("\n")
+
+	// Insert in place;
+	app.(*rleAppender).Insert(0, 1)
+	require.Equal(t, []byte{0, 10, 0, 4, 2, 0, 5, 4, 0, 1, 14, 0, 1, 6, 0, 2, 0}, c.Bytes())
+
+	fmt.Println(c.Bytes())
+	it = c.Iterator(nil)
+	for it.Next() {
+		fmt.Printf("%v,", it.At())
+	}
+	fmt.Printf("\n")
 }

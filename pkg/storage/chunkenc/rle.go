@@ -15,6 +15,7 @@ package chunkenc
 
 import (
 	"encoding/binary"
+	"math"
 )
 
 // RLEChunk implements a run-length-encoding chunk that's useful when there are lots of repetitive values stored.
@@ -101,6 +102,75 @@ func (a *rleAppender) AppendAt(index uint16, v int64) {
 		a.Append(0)
 	}
 	a.Append(v)
+}
+
+// Insert will inset a value into the RLE bytes stream at the given index. If the value is encounted already at the index, it is incremented in place.
+func (a *rleAppender) Insert(index uint16, v int64) {
+
+	it := &rleIterator{
+		br:    newBReader(a.b.bytes()[4:]),
+		total: binary.BigEndian.Uint16(a.b.bytes()),
+		vals:  binary.BigEndian.Uint16(a.b.bytes()[2:]),
+	}
+
+	for i := uint16(0); it.Next(); i++ {
+		switch {
+		case i < index+1: // check the previous index to see if we can simply increment the count
+			fallthrough
+		case i == index:
+			val := it.At()
+
+			// Calculate offset from varint
+			b := math.Ceil(math.Log2(float64(v)) / 7)
+			insertIdx := it.br.streamOffset + 2 - int(b) // add 4 bytes for the header offset, subtract 2 bytes for the counter and b bytes for the varint
+			if it.br.streamOffset == len(it.br.stream) { // don't include trailing 0 if we've read the end of the stream already
+				insertIdx--
+			}
+
+			if val == v { // we can simply increment the count
+				count := binary.BigEndian.Uint16(a.b.bytes()[insertIdx:])
+				binary.BigEndian.PutUint16(a.b.bytes()[insertIdx:], count+1)
+
+				num := binary.BigEndian.Uint16(a.b.bytes())
+				binary.BigEndian.PutUint16(a.b.bytes(), num+1)
+				return
+			}
+
+			if i == index {
+
+				if it.lengthLeft == 0 {
+					// dirtry split
+					panic("dirty split unsupported")
+				}
+
+				remainder := make([]byte, len(a.b.stream)-insertIdx)
+				copy(remainder, a.b.bytes()[insertIdx:len(a.b.stream)-1])
+				a.b.stream = a.b.bytes()[:insertIdx]
+
+				buf := make([]byte, binary.MaxVarintLen64)
+				for _, b := range buf[:binary.PutVarint(buf, v)] {
+					a.b.stream = append(a.b.stream, b)
+				}
+
+				buf = make([]byte, 2)
+				binary.BigEndian.PutUint16(buf, 1)
+				for _, b := range buf {
+					a.b.stream = append(a.b.stream, b)
+				}
+
+				a.b.stream = append(a.b.stream, remainder...)
+
+				num := binary.BigEndian.Uint16(a.b.bytes())
+				binary.BigEndian.PutUint16(a.b.bytes(), num+1)
+				vals := binary.BigEndian.Uint16(a.b.bytes()[2:])
+				binary.BigEndian.PutUint16(a.b.bytes()[2:], vals+1)
+
+				return
+			}
+		default:
+			continue
+		}
+	}
 }
 
 func (c *RLEChunk) Iterator(it Iterator) Iterator {
