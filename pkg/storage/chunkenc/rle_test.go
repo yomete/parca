@@ -14,6 +14,7 @@
 package chunkenc
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -93,4 +94,39 @@ func TestRLEChunk(t *testing.T) {
 
 	require.NoError(t, it.Err())
 	require.False(t, it.Next())
+}
+
+func Test_RLEChunk_Insert(t *testing.T) {
+	c := NewRLEChunk()
+	app, err := c.Appender()
+	require.NoError(t, err)
+
+	for i := 0; i < 3; i++ {
+		app.Append(1)
+		require.Equal(t, i+1, c.NumSamples())
+	}
+	require.Equal(t, []byte{0, 3, 0, 1, 2, 0, 3, 0}, c.Bytes())
+
+	// Insert in-place
+	app.(*rleAppender).Insert(1, 1)
+	require.Equal(t, []byte{0, 4, 0, 1, 2, 0, 4, 0}, c.Bytes())
+
+	for i := 0; i < 2; i++ {
+		app.Append(3)
+	}
+	require.Equal(t, []byte{0, 6, 0, 2, 2, 0, 4, 6, 0, 2, 0}, c.Bytes())
+
+	// Insert out of place; clean split
+	app.(*rleAppender).Insert(4, 2)
+
+	require.Equal(t, []byte{0, 7, 0, 3, 2, 0, 4, 4, 0, 1, 6, 0, 2, 0}, c.Bytes())
+
+	it := c.Iterator(nil)
+	for it.Next() {
+		fmt.Println(it.At())
+	}
+
+	// Insert out of place; clean split
+	app.(*rleAppender).Insert(5, 7)
+	require.Equal(t, []byte{0, 8, 0, 4, 2, 0, 4, 4, 0, 1, 14, 0, 1, 6, 0, 2, 0}, c.Bytes())
 }
