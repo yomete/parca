@@ -54,17 +54,17 @@ func (c *RLEChunk) NumValues() int {
 func (c *RLEChunk) Compact() {}
 
 func (c *RLEChunk) Appender() (Appender, error) {
-	return &rleAppender{
+	return &RLEAppender{
 		b: &c.b,
 	}, nil
 }
 
-type rleAppender struct {
+type RLEAppender struct {
 	b *bstream
 	v int64
 }
 
-func (a *rleAppender) Append(v int64) {
+func (a *RLEAppender) Append(v int64) {
 	num := binary.BigEndian.Uint16(a.b.bytes())
 	vals := binary.BigEndian.Uint16(a.b.bytes()[2:])
 
@@ -95,7 +95,7 @@ func (a *rleAppender) Append(v int64) {
 	binary.BigEndian.PutUint16(a.b.bytes(), num+1)
 }
 
-func (a *rleAppender) AppendAt(index uint16, v int64) {
+func (a *RLEAppender) AppendAt(index uint16, v int64) {
 	num := binary.BigEndian.Uint16(a.b.bytes())
 	// TODO(metalmatze): We should be able to write sequence of zeros to the stream directly (no loops)
 	for i := num; i < index; i++ {
@@ -105,7 +105,7 @@ func (a *rleAppender) AppendAt(index uint16, v int64) {
 }
 
 // Insert will inset a value into the RLE bytes stream at the given index. If the value is encounted already at the index, it is incremented in place.
-func (a *rleAppender) Insert(index uint16, v int64) {
+func (a *RLEAppender) Insert(index uint16, v int64) {
 
 	it := &rleIterator{
 		br:    newBReader(a.b.bytes()[4:]),

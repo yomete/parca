@@ -41,7 +41,7 @@ func (c *DictionaryRLE) String() string {
 	return s
 }
 
-func (c *DictionaryRLE) Insert(_ int, v types.Value) (int, error) {
+func (c *DictionaryRLE) Insert(index int, v types.Value) (int, error) {
 
 	// lookup dictionary index
 	val, ok := c.dict[v]
@@ -51,7 +51,7 @@ func (c *DictionaryRLE) Insert(_ int, v types.Value) (int, error) {
 		c.rev[val] = v
 	}
 
-	c.appender.Append(int64(val))
+	c.appender.(*chunkenc.RLEAppender).Insert(uint16(index), int64(val))
 
 	c.count++
 	return c.count, nil
