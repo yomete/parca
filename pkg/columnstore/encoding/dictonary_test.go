@@ -1,7 +1,6 @@
 package encoding
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/parca-dev/parca/pkg/columnstore/types"
@@ -52,5 +51,5 @@ func Test_DictionaryRLE_Insert(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, i, count)
 
-	fmt.Println(p)
+	require.Equal(t, "{test1},{test2},{test3},\n", p.String())
 }

@@ -51,7 +51,12 @@ func (c *DictionaryRLE) Insert(index int, v types.Value) (int, error) {
 		c.rev[val] = v
 	}
 
-	c.appender.(*chunkenc.RLEAppender).Insert(uint16(index), int64(val))
+	switch index {
+	case c.count:
+		c.appender.Append(int64(val))
+	default:
+		c.appender.(*chunkenc.RLEAppender).Insert(uint16(index), int64(val))
+	}
 
 	c.count++
 	return c.count, nil

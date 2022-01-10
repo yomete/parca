@@ -216,9 +216,15 @@ func (it *rleIterator) Next() bool {
 		}
 		it.v = v
 
-		b := math.Ceil(math.Log2(float64(v)) / 7)
-		if b == 0 {
+		var b uint
+		switch v {
+		case 0:
 			b = 1
+		default:
+			b = uint(math.Ceil(math.Log2(float64(v)) / 7))
+			if b == 0 {
+				b = 1
+			}
 		}
 		it.bsoffset += uint(b)
 		it.vbytes = uint(b)
