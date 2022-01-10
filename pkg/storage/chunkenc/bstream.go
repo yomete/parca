@@ -55,6 +55,7 @@
 package chunkenc
 
 import (
+	"encoding/binary"
 	"io"
 )
 
@@ -223,14 +224,12 @@ func (b *bstreamReader) loadNextBuffer(nbits uint8) bool {
 	// in a optimized way. It's guaranteed that this branch will never read from the
 	// very last byte of the stream (which suffers race conditions due to concurrent
 	// writes).
-	/* TODO(thor) turning off optimization for now to get clean inserts into RLE chunk working
 	if b.streamOffset+8 < len(b.stream) {
 		b.buffer = binary.BigEndian.Uint64(b.stream[b.streamOffset:])
 		b.streamOffset += 8
 		b.valid = 64
 		return true
 	}
-	*/
 
 	// We're here if the are 8 or less bytes left in the stream. Since this reader needs
 	// to handle race conditions with concurrent writes happening on the very last byte

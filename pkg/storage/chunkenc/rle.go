@@ -120,16 +120,11 @@ func (a *rleAppender) Insert(index uint16, v int64) {
 		case i == index:
 			val := it.At()
 
-			// Calculate offset from varint
-			b := math.Ceil(math.Log2(float64(v)) / 7)
-			insertIdx := it.br.streamOffset + 2 - int(b) // add 4 bytes for the header offset, subtract 2 bytes for the counter and b bytes for the varint
-			if it.br.streamOffset == len(it.br.stream) { // don't include trailing 0 if we've read the end of the stream already
-				insertIdx--
-			}
+			totaloffset := it.bsoffset + 4
 
 			if val == v { // we can simply increment the count
-				count := binary.BigEndian.Uint16(a.b.bytes()[insertIdx:])
-				binary.BigEndian.PutUint16(a.b.bytes()[insertIdx:], count+1)
+				count := binary.BigEndian.Uint16(a.b.bytes()[totaloffset-2:])
+				binary.BigEndian.PutUint16(a.b.bytes()[int(totaloffset)-2:], count+1)
 
 				num := binary.BigEndian.Uint16(a.b.bytes())
 				binary.BigEndian.PutUint16(a.b.bytes(), num+1)
@@ -143,9 +138,9 @@ func (a *rleAppender) Insert(index uint16, v int64) {
 					panic("dirty split unsupported")
 				}
 
-				remainder := make([]byte, len(a.b.stream)-insertIdx)
-				copy(remainder, a.b.bytes()[insertIdx:len(a.b.stream)-1])
-				a.b.stream = a.b.bytes()[:insertIdx]
+				remainder := make([]byte, len(a.b.stream)-int(totaloffset-it.vbytes-2))
+				copy(remainder, a.b.bytes()[int(totaloffset-it.vbytes-2):len(a.b.stream)-1])
+				a.b.stream = a.b.bytes()[:int(totaloffset-it.vbytes-2)]
 
 				buf := make([]byte, binary.MaxVarintLen64)
 				for _, b := range buf[:binary.PutVarint(buf, v)] {
@@ -178,7 +173,8 @@ func (c *RLEChunk) Iterator(it Iterator) Iterator {
 }
 
 type rleIterator struct {
-	br bstreamReader
+	br       bstreamReader
+	bsoffset uint
 
 	read  uint16
 	total uint16
@@ -189,8 +185,9 @@ type rleIterator struct {
 	// stores how many different values we have yet to see
 	vals uint16
 
-	v   int64
-	err error
+	v      int64
+	vbytes uint
+	err    error
 }
 
 func (c *RLEChunk) iterator(it Iterator) *rleIterator {
@@ -219,6 +216,13 @@ func (it *rleIterator) Next() bool {
 		}
 		it.v = v
 
+		b := math.Ceil(math.Log2(float64(v)) / 7)
+		if b == 0 {
+			b = 1
+		}
+		it.bsoffset += uint(b)
+		it.vbytes = uint(b)
+
 		lengthBytes := make([]byte, 2)
 		for i := 0; i < 2; i++ {
 			b, err := it.br.ReadByte()
@@ -228,6 +232,7 @@ func (it *rleIterator) Next() bool {
 			}
 			lengthBytes[i] = b
 		}
+		it.bsoffset += 2
 		it.vals--
 		if it.vals > 0 {
 			it.lengthLeft = binary.BigEndian.Uint16(lengthBytes) - 1 // we've already read the first one
