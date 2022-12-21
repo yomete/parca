@@ -83,4 +83,3 @@ repos:
         description: This hook removes redundant npm dependencies and does a fresh installation.
         entry: sh ./scripts/post-merge.sh
         language: system
-        stages: [post-merge]
