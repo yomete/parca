@@ -16,16 +16,8 @@
 # post-merge hook - looks for changes to package.json,
 # when you merge branches, and if found, reinstalls the packages
 
-function changed {
-    git diff --name-only HEAD@'{2}' HEAD | grep "^$1" >/dev/null 2>&1
-}
+find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
+find . -name 'dist' -type d -prune -exec rm -rf '{}' +
 
-if changed 'package.json'; then
-    echo "Package.json changed, removing npm dependencies and re-building"
-
-    find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
-    find . -name 'dist' -type d -prune -exec rm -rf '{}' +
-
-    cd ui && yarn install && yarn build
-    exit 0
-fi
+cd ui && yarn install && yarn build
+exit 0

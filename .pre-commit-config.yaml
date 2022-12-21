@@ -84,10 +84,3 @@ repos:
         entry: sh ./scripts/post-merge.sh
         language: system
         stages: [post-merge]
-      - id: remove-redundant-npm-dependencies-post-checkout
-        name: Remove redundant npm dependencies post checkout
-        description: This hook removes redundant npm dependencies and does a fresh installation.
-        entry: sh ./scripts/post-checkout.sh
-        language: system
-        always_run: true
-        stages: [post-checkout]
